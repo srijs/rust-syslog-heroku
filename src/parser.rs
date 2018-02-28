@@ -9,19 +9,29 @@ use severity::Severity;
 use facility::Facility;
 use message::{Message, ProcId};
 
-#[derive(Debug)]
-pub enum ParseErr {
-    RegexDoesNotMatchErr,
+#[derive(Debug, Fail)]
+pub enum ParseError {
+    #[fail(display = "invalid severity value in priority header")]
     BadSeverityInPri,
+    #[fail(display = "invalid facility value in priority header")]
     BadFacilityInPri,
+    #[fail(display = "unexpected end of input")]
     UnexpectedEndOfInput,
+    #[fail(display = "too few digits")]
     TooFewDigits,
+    #[fail(display = "too many digits")]
     TooManyDigits,
+    #[fail(display = "invalid date time")]
     InvalidDateTime,
-    BaseUnicodeError(str::Utf8Error),
-    UnicodeError(string::FromUtf8Error),
+    #[fail(display = "unicode error: {}", _0)]
+    BaseUnicodeError(#[cause] str::Utf8Error),
+    #[fail(display = "unicode error: {}", _0)]
+    UnicodeError(#[cause] string::FromUtf8Error),
+    #[fail(display = "expected token '{}'", _0)]
     ExpectedTokenErr(char),
-    IntConversionErr(num::ParseIntError),
+    #[fail(display = "parse int error: {}", _0)]
+    IntConversionErr(#[cause] num::ParseIntError),
+    #[fail(display = "missing field '{}'", _0)]
     MissingField(&'static str)
 }
 
@@ -53,8 +63,7 @@ macro_rules! take_item {
     }}
 }
 
-
-type ParseResult<T> = Result<T, ParseErr>;
+type ParseResult<T> = Result<T, ParseError>;
 
 macro_rules! take_char {
     ($e: expr, $c:expr) => {{
@@ -62,11 +71,11 @@ macro_rules! take_char {
             Some($c) => &$e[1..],
             Some(_) => {
                 //println!("Error with rest={:?}", $e);
-                return Err(ParseErr::ExpectedTokenErr($c));
+                return Err(ParseError::ExpectedTokenErr($c));
             },
             None => {
                 //println!("Error with rest={:?}", $e);
-                return Err(ParseErr::UnexpectedEndOfInput);
+                return Err(ParseError::UnexpectedEndOfInput);
             }
         }
     }}
@@ -87,20 +96,20 @@ fn take_while<F>(input: &str, f: F, max_chars: usize) -> (&str, Option<&str>)
 }
 
 fn parse_pri_val(pri: u32) -> ParseResult<(Severity, Facility)> {
-    let sev = Severity::from_int(pri & 0x7).ok_or(ParseErr::BadSeverityInPri)?;
-    let fac = Facility::from_int(pri >> 3).ok_or(ParseErr::BadFacilityInPri)?;
+    let sev = Severity::from_int(pri & 0x7).ok_or(ParseError::BadSeverityInPri)?;
+    let fac = Facility::from_int(pri >> 3).ok_or(ParseError::BadFacilityInPri)?;
     Ok((sev, fac))
 }
 
 fn parse_num(s: &str, min_digits: usize, max_digits: usize) -> ParseResult<(u32, &str)> {
     let (res, rest1) = take_while(s, |c| c >= '0' && c <= '9', max_digits);
-    let rest = rest1.ok_or(ParseErr::UnexpectedEndOfInput)?;
+    let rest = rest1.ok_or(ParseError::UnexpectedEndOfInput)?;
     if res.len() < min_digits {
-        Err(ParseErr::TooFewDigits)
+        Err(ParseError::TooFewDigits)
     } else if res.len() > max_digits {
-        Err(ParseErr::TooManyDigits)
+        Err(ParseError::TooManyDigits)
     } else {
-        Ok((u32::from_str(res).map_err(ParseErr::IntConversionErr)?, rest))
+        Ok((u32::from_str(res).map_err(ParseError::IntConversionErr)?, rest))
     }
 }
 
@@ -134,10 +143,10 @@ fn parse_timestamp(m: &str) -> ParseResult<(Option<DateTime<FixedOffset>>, &str)
             let (sign, irest) = match c {
                 '+' => (1, &rest[1..]),
                 '-' => (-1, &rest[1..]),
-                _ => { return Err(ParseErr::InvalidDateTime); }
+                _ => { return Err(ParseError::InvalidDateTime); }
             };
-            let hours = i32::from_str(&irest[0..2]).map_err(ParseErr::IntConversionErr)?;
-            let minutes = i32::from_str(&irest[3..5]).map_err(ParseErr::IntConversionErr)?;
+            let hours = i32::from_str(&irest[0..2]).map_err(ParseError::IntConversionErr)?;
+            let minutes = i32::from_str(&irest[3..5]).map_err(ParseError::IntConversionErr)?;
             rest = &irest[5..];
             minutes + hours * 60 * sign
         }
@@ -148,7 +157,7 @@ fn parse_timestamp(m: &str) -> ParseResult<(Option<DateTime<FixedOffset>>, &str)
             .single()
     });
     match result {
-        None => Err(ParseErr::InvalidDateTime),
+        None => Err(ParseError::InvalidDateTime),
         Some(tm) => Ok((Some(tm), rest))
     }
 }
@@ -162,21 +171,20 @@ fn parse_term(m: &str, min_length: usize, max_length: usize) -> ParseResult<(Opt
         //println!("idx={:?}, buf={:?}, chr={:?}", idx, buf, chr);
         if *chr < 33 || *chr > 126 {
             if idx < min_length {
-                return Err(ParseErr::TooFewDigits);
+                return Err(ParseError::TooFewDigits);
             }
-            let utf8_ary = str::from_utf8(&byte_ary[..idx]).map_err(ParseErr::BaseUnicodeError)?;
+            let utf8_ary = str::from_utf8(&byte_ary[..idx]).map_err(ParseError::BaseUnicodeError)?;
             return Ok((Some(String::from(utf8_ary)), &m[idx..]));
         }
         if idx >= max_length {
-            let utf8_ary = str::from_utf8(&byte_ary[..idx]).map_err(ParseErr::BaseUnicodeError)?;
+            let utf8_ary = str::from_utf8(&byte_ary[..idx]).map_err(ParseError::BaseUnicodeError)?;
             return Ok((Some(String::from(utf8_ary)), &m[idx..]));
         }
     }
-    Err(ParseErr::UnexpectedEndOfInput)
+    Err(ParseError::UnexpectedEndOfInput)
 }
 
-
-fn parse_message_s(m: &str) -> ParseResult<Message> {
+pub fn parse_message(m: &str) -> ParseResult<Message> {
     let mut rest = m;
     take_char!(rest, '<');
     let prival = take_item!(parse_num(rest, 1, 3), rest);
@@ -224,32 +232,6 @@ fn parse_message_s(m: &str) -> ParseResult<Message> {
         msg: msg
     })
 }
-
-
-
-/// Parse a string into a `MessageType` object
-///
-/// # Arguments
-///
-///  * `s`: Anything convertible to a string
-///
-/// # Returns
-///
-///  * `ParseErr` if the string is not parseable as an RFC5424 message
-///
-/// # Example
-///
-/// ```
-/// use syslog_rfc5424::parse_message;
-///
-/// let message = parse_message("<78>1 2016-01-15T00:04:01+00:00 host1 CROND 10391 - [meta sequenceId=\"29\"] some_message").unwrap();
-///
-/// assert!(message.hostname.unwrap() == "host1");
-/// ```
-pub fn parse_message<S: AsRef<str>> (s: S) -> ParseResult<Message> {
-    parse_message_s(s.as_ref())
-}
-
 
 #[cfg(test)]
 mod tests {

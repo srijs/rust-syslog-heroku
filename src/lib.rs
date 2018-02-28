@@ -11,7 +11,7 @@
 //! A simple syslog server
 //!
 //! ```no_run
-//! use syslog_rfc5424::parse_message;
+//! use syslog_rfc5424::Message;
 //! use std::net::UdpSocket;
 //! use std::str;
 //!
@@ -19,7 +19,7 @@
 //! let mut buf = [0u8; 2048];
 //! loop {
 //!     let (data_read, _) = s.recv_from(&mut buf).unwrap();
-//!     let msg = parse_message(str::from_utf8(&buf[0..data_read]).unwrap()).unwrap();
+//!     let msg = str::from_utf8(&buf[0..data_read]).unwrap().parse::<Message>().unwrap();
 //!     println!("{:?} {:?} {:?} {:?}", msg.facility, msg.severity, msg.hostname, msg.msg);
 //! }
 //! ```
@@ -32,14 +32,15 @@
 //!
 #[cfg(test)]
 extern crate assert_matches;
+#[macro_use] extern crate failure;
 extern crate chrono;
 
-pub mod message;
+mod message;
 mod severity;
 mod facility;
-pub mod parser;
+mod parser;
 
 pub use severity::Severity;
 pub use facility::Facility;
-
-pub use parser::parse_message;
+pub use message::{ProcId, Message};
+pub use parser::ParseError;
