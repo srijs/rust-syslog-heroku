@@ -1,8 +1,8 @@
-#[derive(Copy,Clone,Debug,PartialEq)]
-#[allow(non_camel_case_types)]
 /// Syslog facilities. Taken From RFC 5424, but I've heard that some platforms mix these around.
 /// Names are from Linux.
-pub enum SyslogFacility {
+#[derive(Copy, Clone, Debug, PartialEq)]
+#[allow(non_camel_case_types)]
+pub enum Facility {
     LOG_KERN = 0,
     LOG_USER = 1,
     LOG_MAIL = 2,
@@ -29,34 +29,34 @@ pub enum SyslogFacility {
     LOG_LOCAL7 = 23,
 }
 
-impl SyslogFacility {
-    /// Convert an int (as used in the wire serialization) into a `SyslogFacility`
+impl Facility {
+    /// Convert an int (as used in the wire serialization) into a `Facility`
     pub fn from_int(i: u32) -> Option<Self> {
         match i {
-            0 => Some(SyslogFacility::LOG_KERN),
-            1 => Some(SyslogFacility::LOG_USER),
-            2 => Some(SyslogFacility::LOG_MAIL),
-            3 => Some(SyslogFacility::LOG_DAEMON),
-            4 => Some(SyslogFacility::LOG_AUTH),
-            5 => Some(SyslogFacility::LOG_SYSLOG),
-            6 => Some(SyslogFacility::LOG_LPR),
-            7 => Some(SyslogFacility::LOG_NEWS),
-            8 => Some(SyslogFacility::LOG_UUCP),
-            9 => Some(SyslogFacility::LOG_CRON),
-            10 => Some(SyslogFacility::LOG_AUTHPRIV),
-            11 => Some(SyslogFacility::LOG_FTP),
-            12 => Some(SyslogFacility::LOG_NTP),
-            13 => Some(SyslogFacility::LOG_AUDIT),
-            14 => Some(SyslogFacility::LOG_ALERT),
-            15 => Some(SyslogFacility::LOG_CLOCKD),
-            16 => Some(SyslogFacility::LOG_LOCAL0),
-            17 => Some(SyslogFacility::LOG_LOCAL1),
-            18 => Some(SyslogFacility::LOG_LOCAL2),
-            19 => Some(SyslogFacility::LOG_LOCAL3),
-            20 => Some(SyslogFacility::LOG_LOCAL4),
-            21 => Some(SyslogFacility::LOG_LOCAL5),
-            22 => Some(SyslogFacility::LOG_LOCAL6),
-            23 => Some(SyslogFacility::LOG_LOCAL7),
+            0 => Some(Facility::LOG_KERN),
+            1 => Some(Facility::LOG_USER),
+            2 => Some(Facility::LOG_MAIL),
+            3 => Some(Facility::LOG_DAEMON),
+            4 => Some(Facility::LOG_AUTH),
+            5 => Some(Facility::LOG_SYSLOG),
+            6 => Some(Facility::LOG_LPR),
+            7 => Some(Facility::LOG_NEWS),
+            8 => Some(Facility::LOG_UUCP),
+            9 => Some(Facility::LOG_CRON),
+            10 => Some(Facility::LOG_AUTHPRIV),
+            11 => Some(Facility::LOG_FTP),
+            12 => Some(Facility::LOG_NTP),
+            13 => Some(Facility::LOG_AUDIT),
+            14 => Some(Facility::LOG_ALERT),
+            15 => Some(Facility::LOG_CLOCKD),
+            16 => Some(Facility::LOG_LOCAL0),
+            17 => Some(Facility::LOG_LOCAL1),
+            18 => Some(Facility::LOG_LOCAL2),
+            19 => Some(Facility::LOG_LOCAL3),
+            20 => Some(Facility::LOG_LOCAL4),
+            21 => Some(Facility::LOG_LOCAL5),
+            22 => Some(Facility::LOG_LOCAL6),
+            23 => Some(Facility::LOG_LOCAL7),
             _ => None,
         }
     }
@@ -64,40 +64,40 @@ impl SyslogFacility {
     /// Convert a syslog facility into a unique string representation
     pub fn as_str(&self) -> &'static str {
         match *self {
-            SyslogFacility::LOG_KERN => "kern",
-            SyslogFacility::LOG_USER => "user",
-            SyslogFacility::LOG_MAIL => "mail",
-            SyslogFacility::LOG_DAEMON => "daemon",
-            SyslogFacility::LOG_AUTH => "auth",
-            SyslogFacility::LOG_SYSLOG => "syslog",
-            SyslogFacility::LOG_LPR => "lpr",
-            SyslogFacility::LOG_NEWS => "news",
-            SyslogFacility::LOG_UUCP => "uucp",
-            SyslogFacility::LOG_CRON => "cron",
-            SyslogFacility::LOG_AUTHPRIV => "authpriv",
-            SyslogFacility::LOG_FTP => "ftp",
-            SyslogFacility::LOG_NTP => "ntp",
-            SyslogFacility::LOG_AUDIT => "audit",
-            SyslogFacility::LOG_ALERT => "alert",
-            SyslogFacility::LOG_CLOCKD => "clockd",
-            SyslogFacility::LOG_LOCAL0 => "local0",
-            SyslogFacility::LOG_LOCAL1 => "local1",
-            SyslogFacility::LOG_LOCAL2 => "local2",
-            SyslogFacility::LOG_LOCAL3 => "local3",
-            SyslogFacility::LOG_LOCAL4 => "local4",
-            SyslogFacility::LOG_LOCAL5 => "local5",
-            SyslogFacility::LOG_LOCAL6 => "local6",
-            SyslogFacility::LOG_LOCAL7 => "local7",
+            Facility::LOG_KERN => "kern",
+            Facility::LOG_USER => "user",
+            Facility::LOG_MAIL => "mail",
+            Facility::LOG_DAEMON => "daemon",
+            Facility::LOG_AUTH => "auth",
+            Facility::LOG_SYSLOG => "syslog",
+            Facility::LOG_LPR => "lpr",
+            Facility::LOG_NEWS => "news",
+            Facility::LOG_UUCP => "uucp",
+            Facility::LOG_CRON => "cron",
+            Facility::LOG_AUTHPRIV => "authpriv",
+            Facility::LOG_FTP => "ftp",
+            Facility::LOG_NTP => "ntp",
+            Facility::LOG_AUDIT => "audit",
+            Facility::LOG_ALERT => "alert",
+            Facility::LOG_CLOCKD => "clockd",
+            Facility::LOG_LOCAL0 => "local0",
+            Facility::LOG_LOCAL1 => "local1",
+            Facility::LOG_LOCAL2 => "local2",
+            Facility::LOG_LOCAL3 => "local3",
+            Facility::LOG_LOCAL4 => "local4",
+            Facility::LOG_LOCAL5 => "local5",
+            Facility::LOG_LOCAL6 => "local6",
+            Facility::LOG_LOCAL7 => "local7",
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::SyslogFacility;
+    use super::Facility;
 
     #[test]
     fn test_deref() {
-        assert_eq!(SyslogFacility::LOG_KERN.as_str(), "kern");
+        assert_eq!(Facility::LOG_KERN.as_str(), "kern");
     }
 }

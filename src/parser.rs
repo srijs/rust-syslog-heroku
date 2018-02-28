@@ -5,9 +5,9 @@ use std::string;
 
 use chrono::{DateTime, FixedOffset, TimeZone};
 
-use severity;
-use facility;
-use message::{SyslogMessage, ProcIdType};
+use severity::Severity;
+use facility::Facility;
+use message::{Message, ProcId};
 
 #[derive(Debug)]
 pub enum ParseErr {
@@ -86,9 +86,9 @@ fn take_while<F>(input: &str, f: F, max_chars: usize) -> (&str, Option<&str>)
     ("", None)
 }
 
-fn parse_pri_val(pri: u32) -> ParseResult<(severity::SyslogSeverity, facility::SyslogFacility)> {
-    let sev = severity::SyslogSeverity::from_int(pri & 0x7).ok_or(ParseErr::BadSeverityInPri)?;
-    let fac = facility::SyslogFacility::from_int(pri >> 3).ok_or(ParseErr::BadFacilityInPri)?;
+fn parse_pri_val(pri: u32) -> ParseResult<(Severity, Facility)> {
+    let sev = Severity::from_int(pri & 0x7).ok_or(ParseErr::BadSeverityInPri)?;
+    let fac = Facility::from_int(pri >> 3).ok_or(ParseErr::BadFacilityInPri)?;
     Ok((sev, fac))
 }
 
@@ -176,7 +176,7 @@ fn parse_term(m: &str, min_length: usize, max_length: usize) -> ParseResult<(Opt
 }
 
 
-fn parse_message_s(m: &str) -> ParseResult<SyslogMessage> {
+fn parse_message_s(m: &str) -> ParseResult<Message> {
     let mut rest = m;
     take_char!(rest, '<');
     let prival = take_item!(parse_num(rest, 1, 3), rest);
@@ -198,8 +198,8 @@ fn parse_message_s(m: &str) -> ParseResult<SyslogMessage> {
     let procid = match procid_r {
         None => None,
         Some(s) => Some(match u32::from_str(&s) {
-            Ok(n) => ProcIdType::PID(n),
-            Err(_) => ProcIdType::Name(s)
+            Ok(n) => ProcId::Pid(n),
+            Err(_) => ProcId::Name(s)
         })
     };
     //println!("got procid {:?}, rest={:?}", procid, rest);
@@ -212,7 +212,7 @@ fn parse_message_s(m: &str) -> ParseResult<SyslogMessage> {
     };
     let msg = String::from(rest);
 
-    Ok(SyslogMessage {
+    Ok(Message {
         severity: sev,
         facility: fac,
         version: version,
@@ -227,7 +227,7 @@ fn parse_message_s(m: &str) -> ParseResult<SyslogMessage> {
 
 
 
-/// Parse a string into a `SyslogMessage` object
+/// Parse a string into a `MessageType` object
 ///
 /// # Arguments
 ///
@@ -246,7 +246,7 @@ fn parse_message_s(m: &str) -> ParseResult<SyslogMessage> {
 ///
 /// assert!(message.hostname.unwrap() == "host1");
 /// ```
-pub fn parse_message<S: AsRef<str>> (s: S) -> ParseResult<SyslogMessage> {
+pub fn parse_message<S: AsRef<str>> (s: S) -> ParseResult<Message> {
     parse_message_s(s.as_ref())
 }
 
@@ -255,20 +255,20 @@ pub fn parse_message<S: AsRef<str>> (s: S) -> ParseResult<SyslogMessage> {
 mod tests {
     use super::parse_message;
 
-    use message::ProcIdType;
-    use facility::SyslogFacility;
-    use severity::SyslogSeverity;
+    use message::ProcId;
+    use facility::Facility;
+    use severity::Severity;
 
     #[test]
     fn test_router_message() {
         let msg = parse_message(r#"<158>1 2014-08-04T18:28:43.078581+00:00 host heroku router - at=info method=GET path="/foo" host=app-name-7277.herokuapp.com request_id=e5bb3580-44b0-46d2-aad3-185263641044 fwd="50.168.96.221" dyno=web.1 connect=0ms service=2ms status=200 bytes=415"#)
             .expect("Should parse router message");
-        assert_eq!(msg.facility, SyslogFacility::LOG_LOCAL3);
-        assert_eq!(msg.severity, SyslogSeverity::SEV_INFO);
+        assert_eq!(msg.facility, Facility::LOG_LOCAL3);
+        assert_eq!(msg.severity, Severity::SEV_INFO);
         assert_eq!(msg.timestamp.map(|dt| dt.timestamp()), Some(1407176923));
         assert_eq!(msg.hostname, Some("host".to_owned()));
         assert_eq!(msg.appname, Some("heroku".to_owned()));
-        assert_eq!(msg.procid, Some(ProcIdType::Name("router".to_owned())));
+        assert_eq!(msg.procid, Some(ProcId::Name("router".to_owned())));
         assert_eq!(msg.msgid, None);
     }
 
@@ -276,12 +276,12 @@ mod tests {
     fn test_web_app_message() {
         let msg = parse_message(r#"<190>1 2014-08-04T18:28:43.015630+00:00 host app web.1 - 50.168.96.221 - - [04/Aug/2014 18:28:43] "GET /foo HTTP/1.1" 200 12 0.0019"#)
             .expect("Should parse web app message");
-        assert_eq!(msg.facility, SyslogFacility::LOG_LOCAL7);
-        assert_eq!(msg.severity, SyslogSeverity::SEV_INFO);
+        assert_eq!(msg.facility, Facility::LOG_LOCAL7);
+        assert_eq!(msg.severity, Severity::SEV_INFO);
         assert_eq!(msg.timestamp.map(|dt| dt.timestamp()), Some(1407176923));
         assert_eq!(msg.hostname, Some("host".to_owned()));
         assert_eq!(msg.appname, Some("app".to_owned()));
-        assert_eq!(msg.procid, Some(ProcIdType::Name("web.1".to_owned())));
+        assert_eq!(msg.procid, Some(ProcId::Name("web.1".to_owned())));
         assert_eq!(msg.msgid, None);
     }
 }

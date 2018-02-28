@@ -39,7 +39,7 @@ mod severity;
 mod facility;
 pub mod parser;
 
-pub use severity::SyslogSeverity;
-pub use facility::SyslogFacility;
+pub use severity::Severity;
+pub use facility::Facility;
 
 pub use parser::parse_message;
