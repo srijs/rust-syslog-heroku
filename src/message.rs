@@ -2,22 +2,16 @@
 
 use std::string::String;
 
-#[allow(non_camel_case_types)]
-pub type time_t = i64;
-#[allow(non_camel_case_types)]
-pub type pid_t = i32;
-#[allow(non_camel_case_types)]
-pub type msgid_t = String;
-pub type MessageType = String;
+use chrono::DateTime;
+use chrono::offset::FixedOffset;
 
 use severity;
 use facility;
 
-
 #[derive(Clone,Debug,PartialEq,Eq)]
 /// `ProcID`s are usually numeric PIDs; however, on some systems, they may be something else
 pub enum ProcIdType {
-    PID(pid_t),
+    PID(u32),
     Name(String)
 }
 
@@ -25,11 +19,11 @@ pub enum ProcIdType {
 pub struct SyslogMessage {
     pub severity: severity::SyslogSeverity,
     pub facility: facility::SyslogFacility,
-    pub version: i32,
-    pub timestamp: Option<time_t>,
+    pub version: u32,
+    pub timestamp: Option<DateTime<FixedOffset>>,
     pub hostname: Option<String>,
     pub appname: Option<String>,
     pub procid: Option<ProcIdType>,
-    pub msgid: Option<msgid_t>,
+    pub msgid: Option<String>,
     pub msg: String,
 }

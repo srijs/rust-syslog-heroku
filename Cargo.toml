@@ -10,10 +10,10 @@ license = "ISC"
 readme = "README.md"
 
 [dependencies]
-time = "^0.1"
 # this should be a dev dependency, but there's some kind of issue with
 # dev-only macro crates
 assert_matches = "1.0"
+chrono = "0.4.0"
 
 [dev-dependencies]
 timeit = "0.1"

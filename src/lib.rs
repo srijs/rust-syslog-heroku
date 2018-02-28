@@ -32,7 +32,7 @@
 //!
 #[cfg(test)]
 extern crate assert_matches;
-extern crate time;
+extern crate chrono;
 
 pub mod message;
 mod severity;

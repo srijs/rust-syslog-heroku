@@ -3,12 +3,11 @@ use std::str;
 use std::num;
 use std::string;
 
-use time;
-
+use chrono::{DateTime, FixedOffset, TimeZone};
 
 use severity;
 use facility;
-use message::{time_t,SyslogMessage,ProcIdType};
+use message::{SyslogMessage, ProcIdType};
 
 #[derive(Debug)]
 pub enum ParseErr {
@@ -18,7 +17,7 @@ pub enum ParseErr {
     UnexpectedEndOfInput,
     TooFewDigits,
     TooManyDigits,
-    InvalidUTCOffset,
+    InvalidDateTime,
     BaseUnicodeError(str::Utf8Error),
     UnicodeError(string::FromUtf8Error),
     ExpectedTokenErr(char),
@@ -87,13 +86,13 @@ fn take_while<F>(input: &str, f: F, max_chars: usize) -> (&str, Option<&str>)
     ("", None)
 }
 
-fn parse_pri_val(pri: i32) -> ParseResult<(severity::SyslogSeverity, facility::SyslogFacility)> {
+fn parse_pri_val(pri: u32) -> ParseResult<(severity::SyslogSeverity, facility::SyslogFacility)> {
     let sev = severity::SyslogSeverity::from_int(pri & 0x7).ok_or(ParseErr::BadSeverityInPri)?;
     let fac = facility::SyslogFacility::from_int(pri >> 3).ok_or(ParseErr::BadFacilityInPri)?;
     Ok((sev, fac))
 }
 
-fn parse_num(s: &str, min_digits: usize, max_digits: usize) -> ParseResult<(i32, &str)> {
+fn parse_num(s: &str, min_digits: usize, max_digits: usize) -> ParseResult<(u32, &str)> {
     let (res, rest1) = take_while(s, |c| c >= '0' && c <= '9', max_digits);
     let rest = rest1.ok_or(ParseErr::UnexpectedEndOfInput)?;
     if res.len() < min_digits {
@@ -101,32 +100,30 @@ fn parse_num(s: &str, min_digits: usize, max_digits: usize) -> ParseResult<(i32,
     } else if res.len() > max_digits {
         Err(ParseErr::TooManyDigits)
     } else {
-        Ok((i32::from_str(res).map_err(ParseErr::IntConversionErr)?, rest))
+        Ok((u32::from_str(res).map_err(ParseErr::IntConversionErr)?, rest))
     }
 }
 
-fn parse_timestamp(m: &str) -> ParseResult<(Option<time_t>, &str)> {
+fn parse_timestamp(m: &str) -> ParseResult<(Option<DateTime<FixedOffset>>, &str)> {
     let mut rest = m;
     if rest.starts_with('-') {
         return Ok((None, &rest[1..]))
     }
-    let mut tm = time::empty_tm();
-    tm.tm_year = take_item!(parse_num(rest, 4, 4), rest) - 1900;
+    let tm_year = take_item!(parse_num(rest, 4, 4), rest);
     take_char!(rest, '-');
-    tm.tm_mon = take_item!(parse_num(rest, 2, 2), rest) - 1;
+    let tm_mon = take_item!(parse_num(rest, 2, 2), rest);
     take_char!(rest, '-');
-    tm.tm_mday = take_item!(parse_num(rest, 2, 2), rest);
+    let tm_mday = take_item!(parse_num(rest, 2, 2), rest);
     take_char!(rest, 'T');
-    tm.tm_hour = take_item!(parse_num(rest, 2, 2), rest);
+    let tm_hour = take_item!(parse_num(rest, 2, 2), rest);
     take_char!(rest, ':');
-    tm.tm_min = take_item!(parse_num(rest, 2, 2), rest);
+    let tm_min = take_item!(parse_num(rest, 2, 2), rest);
     take_char!(rest, ':');
-    tm.tm_sec = take_item!(parse_num(rest, 2, 2), rest);
+    let tm_sec = take_item!(parse_num(rest, 2, 2), rest);
     if rest.starts_with('.') {
         take_char!(rest, '.');
         take_item!(parse_num(rest, 1, 6), rest);
     }
-    // Tm::utcoff is totally broken, don't use it.
     let utc_offset_mins = match rest.chars().next() {
         None => 0,
         Some('Z') => {
@@ -137,7 +134,7 @@ fn parse_timestamp(m: &str) -> ParseResult<(Option<time_t>, &str)> {
             let (sign, irest) = match c {
                 '+' => (1, &rest[1..]),
                 '-' => (-1, &rest[1..]),
-                _ => { return Err(ParseErr::InvalidUTCOffset); }
+                _ => { return Err(ParseErr::InvalidDateTime); }
             };
             let hours = i32::from_str(&irest[0..2]).map_err(ParseErr::IntConversionErr)?;
             let minutes = i32::from_str(&irest[3..5]).map_err(ParseErr::IntConversionErr)?;
@@ -145,9 +142,15 @@ fn parse_timestamp(m: &str) -> ParseResult<(Option<time_t>, &str)> {
             minutes + hours * 60 * sign
         }
     };
-    tm = tm + time::Duration::minutes(i64::from(utc_offset_mins));
-    tm.tm_isdst = -1;
-    Ok((Some(tm.to_utc().to_timespec().sec), rest))
+    let result = FixedOffset::east_opt(utc_offset_mins * 60).and_then(|off| {
+        off.ymd_opt(tm_year as i32, tm_mon, tm_mday)
+            .and_hms_opt(tm_hour, tm_min, tm_sec)
+            .single()
+    });
+    match result {
+        None => Err(ParseErr::InvalidDateTime),
+        Some(tm) => Ok((Some(tm), rest))
+    }
 }
 
 fn parse_term(m: &str, min_length: usize, max_length: usize) -> ParseResult<(Option<String>, &str)> {
@@ -194,7 +197,7 @@ fn parse_message_s(m: &str) -> ParseResult<SyslogMessage> {
     let procid_r = take_item!(parse_term(rest, 1, 128), rest);
     let procid = match procid_r {
         None => None,
-        Some(s) => Some(match i32::from_str(&s) {
+        Some(s) => Some(match u32::from_str(&s) {
             Ok(n) => ProcIdType::PID(n),
             Err(_) => ProcIdType::Name(s)
         })
@@ -262,7 +265,7 @@ mod tests {
             .expect("Should parse router message");
         assert_eq!(msg.facility, SyslogFacility::LOG_LOCAL3);
         assert_eq!(msg.severity, SyslogSeverity::SEV_INFO);
-        assert_eq!(msg.timestamp, Some(1407176923));
+        assert_eq!(msg.timestamp.map(|dt| dt.timestamp()), Some(1407176923));
         assert_eq!(msg.hostname, Some("host".to_owned()));
         assert_eq!(msg.appname, Some("heroku".to_owned()));
         assert_eq!(msg.procid, Some(ProcIdType::Name("router".to_owned())));
@@ -275,7 +278,7 @@ mod tests {
             .expect("Should parse web app message");
         assert_eq!(msg.facility, SyslogFacility::LOG_LOCAL7);
         assert_eq!(msg.severity, SyslogSeverity::SEV_INFO);
-        assert_eq!(msg.timestamp, Some(1407176923));
+        assert_eq!(msg.timestamp.map(|dt| dt.timestamp()), Some(1407176923));
         assert_eq!(msg.hostname, Some("host".to_owned()));
         assert_eq!(msg.appname, Some("app".to_owned()));
         assert_eq!(msg.procid, Some(ProcIdType::Name("web.1".to_owned())));
