@@ -8,7 +8,7 @@ use time;
 
 use severity;
 use facility;
-use message::{time_t,SyslogMessage,ProcIdType,StructuredData};
+use message::{time_t,SyslogMessage,ProcIdType};
 
 #[derive(Debug)]
 pub enum ParseErr {
@@ -218,7 +218,6 @@ fn parse_message_s(m: &str) -> ParseResult<SyslogMessage> {
         appname: appname,
         procid: procid,
         msgid: msgid,
-        sd: StructuredData::new_empty(),
         msg: msg
     })
 }
