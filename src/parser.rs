@@ -63,11 +63,9 @@ macro_rules! take_char {
         $e = match $e.chars().next() {
             Some($c) => &$e[1..],
             Some(_) => {
-                //println!("Error with rest={:?}", $e);
                 return Err(ParseError::ExpectedToken($c));
             },
             None => {
-                //println!("Error with rest={:?}", $e);
                 return Err(ParseError::UnexpectedEndOfInput);
             }
         }
@@ -159,7 +157,6 @@ fn parse_term(m: &str, min_length: usize, max_length: usize) -> ParseResult<(Opt
     }
     let byte_ary = m.as_bytes();
     for (idx, chr) in byte_ary.iter().enumerate() {
-        //println!("idx={:?}, buf={:?}, chr={:?}", idx, buf, chr);
         if *chr < 33 || *chr > 126 {
             if idx < min_length {
                 return Err(ParseError::TooFewDigits);
@@ -185,22 +182,16 @@ pub fn parse_message(m: &str) -> ParseResult<Message> {
     if version != 1 {
         return Err(ParseError::UnsupportedVersion(version));
     }
-    //println!("got version {:?}, rest={:?}", version, rest);
     take_char!(rest, ' ');
     let timestamp = take_item!(parse_timestamp(rest), rest);
-    //println!("got timestamp {:?}, rest={:?}", timestamp, rest);
     take_char!(rest, ' ');
     let hostname = take_item!(parse_term(rest, 1, 255), rest);
-    //println!("got hostname {:?}, rest={:?}", hostname, rest);
     take_char!(rest, ' ');
     let appname = take_item!(parse_term(rest, 1, 48), rest);
-    //println!("got appname {:?}, rest={:?}", appname, rest);
     take_char!(rest, ' ');
     let procid = take_item!(parse_term(rest, 1, 128), rest);
-    //println!("got procid {:?}, rest={:?}", procid, rest);
     take_char!(rest, ' ');
     let msgid = take_item!(parse_term(rest, 1, 32), rest);
-    //println!("got sd {:?}, rest={:?}", sd, rest);
     rest = match maybe_expect_char!(rest, ' ') {
         Some(r) => r,
         None => rest
