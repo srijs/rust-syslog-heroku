@@ -10,9 +10,6 @@ license = "ISC"
 readme = "README.md"
 
 [dependencies]
-# this should be a dev dependency, but there's some kind of issue with
-# dev-only macro crates
-assert_matches = "1.0"
 failure = "0.1.1"
 chrono = "0.4.0"
 
