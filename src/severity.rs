@@ -16,7 +16,7 @@ impl Severity {
     ///
     /// Returns an Option, but the wire protocol will only include 0..7, so should
     /// never return None in practical usage.
-    pub fn from_int(i: u32) -> Option<Self> {
+    pub(crate) fn from_int(i: u32) -> Option<Self> {
         match i {
             0 => Some(Severity::Emergency),
             1 => Some(Severity::Alert),
