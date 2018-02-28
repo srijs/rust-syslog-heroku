@@ -1,9 +1,3 @@
-#[cfg(feature = "rustc-serialize")]
-use rustc_serialize::{Encodable,Encoder};
-
-#[cfg(feature="serde-serialize")]
-use serde::{Serializer, Serialize};
-
 #[derive(Copy,Clone,Debug,PartialEq)]
 #[allow(non_camel_case_types)]
 /// Syslog Severities from RFC 5424.
@@ -51,25 +45,6 @@ impl SyslogSeverity {
         }
     }
 }
-
-
-
-#[cfg(feature = "rustc-serialize")]
-impl Encodable for SyslogSeverity {
-    fn encode<S: Encoder>(&self, s: &mut S) -> Result<(), S::Error>
-    {
-        s.emit_str(self.as_str())
-    }
-}
-
-
-#[cfg(feature = "serde-serialize")]
-impl Serialize for SyslogSeverity {
-    fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
-        ser.serialize_str(self.as_str())
-    }
-}
-
 
 #[cfg(test)]
 mod tests {
