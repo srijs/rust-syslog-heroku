@@ -1,5 +1,3 @@
-//! In-memory representation of a single Syslog message.
-
 use std::string::String;
 use std::str::FromStr;
 
@@ -9,7 +7,8 @@ use chrono::offset::FixedOffset;
 use severity::Severity;
 use parser::{ParseError, parse_message};
 
-#[derive(Clone,Debug)]
+/// Represents a message being send to a Heroku Log Drain
+#[derive(Clone, Debug)]
 pub struct Message {
     pub severity: Severity,
     pub timestamp: Option<DateTime<FixedOffset>>,

@@ -1,11 +1,9 @@
 [package]
-name = "syslog_rfc5424"
-version = "0.4.0"
-authors = ["James Brown <roguelazer@roguelazer.com>"]
-description = "Parser for RFC5424 (IETF-format) syslog messages"
-documentation = "http://roguelazer.github.io/rust-syslog-rfc5424/syslog_rfc5424/"
-homepage = "https://github.com/Roguelazer/rust-syslog-rfc5424"
-repository = "https://github.com/Roguelazer/rust-syslog-rfc5424"
+name = "syslog_heroku"
+version = "0.1.0"
+authors = ["Sam Rijs <srijs@airpost.net>"]
+description = "Parser for Heroku (Logplex) syslog messages"
+repository = "https://github.com/srijs/rust-syslog-heroku"
 license = "ISC"
 readme = "README.md"
 
@@ -14,4 +12,4 @@ failure = "0.1.1"
 chrono = "0.4.0"
 
 [dev-dependencies]
-timeit = "0.1"
+timeit = "0.1.2"

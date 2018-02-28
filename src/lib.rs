@@ -1,35 +1,22 @@
-//! Parser for [RFC 5424](https://tools.ietf.org/html/rfc5424) Syslog messages. Not to be confused
-//! with the older [RFC 3164](https://tools.ietf.org/html/rfc3164) BSD Syslog protocol, which many
-//! systems still emit.
+//! This module implements a parser for Heroku (Logplex) syslog messages, which is useful when implementing a
+//! [Logplex HTTP Drain](https://github.com/heroku/logplex/blob/master/doc/README.http_drains.md).
 //!
-//! In particular, supports the Structured Data fields.
+//! These syslog messages are similar to [RFC5424](https://tools.ietf.org/html/rfc5424) messages,
+//! with the notable exception that they leave out `STRUCTURED-DATA` but do not replace it with a `NILVALUE`.
 //!
-//! Usually, you'll just call the (re-exported) `parse_message` function with a stringy object.
+//! Usually, you'll just use the `FromStr` trait on the `Message` struct to parse a message.
 //!
 //! # Example
 //!
-//! A simple syslog server
+//! ```
+//! use syslog_heroku::Message;
 //!
-//! ```no_run
-//! use syslog_rfc5424::Message;
-//! use std::net::UdpSocket;
-//! use std::str;
-//!
-//! let s = UdpSocket::bind("127.0.0.1:10514").unwrap();
-//! let mut buf = [0u8; 2048];
-//! loop {
-//!     let (data_read, _) = s.recv_from(&mut buf).unwrap();
-//!     let msg = str::from_utf8(&buf[0..data_read]).unwrap().parse::<Message>().unwrap();
+//! fn main() {
+//!     let msg = "<45>1 2018-02-28T09:30:53.345547+00:00 host heroku web.1 - Process exited with status 143"
+//!         .parse::<Message>().unwrap();
 //!     println!("{:?} {:?} {:?}", msg.severity, msg.hostname, msg.msg);
 //! }
 //! ```
-//!
-//! # Unimplemented Features
-//!
-//!  * Theoretically, you can send arbitrary (non-unicode) bytes for the message part of a syslog
-//!    message. Rust doesn't have a convenient way to only treat *some* of a buffer as utf-8,
-//!    so I'm just not supporting that. Most "real" syslog servers barf on it anway.
-//!
 #[macro_use] extern crate failure;
 extern crate chrono;
 

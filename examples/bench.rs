@@ -1,8 +1,8 @@
 #[macro_use]
 extern crate timeit;
-extern crate syslog_rfc5424;
+extern crate syslog_heroku;
 
-use syslog_rfc5424::Message;
+use syslog_heroku::Message;
 
 // Stupid benchmark tool using the timeit! macro because the official benchmarking tools are
 // **still* nightly-Rust-only, even though they're, like, a year old

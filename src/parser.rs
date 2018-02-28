@@ -6,6 +6,7 @@ use chrono::{DateTime, FixedOffset, TimeZone};
 use severity::Severity;
 use message::Message;
 
+/// Signals a failure when parsing an incoming message
 #[derive(Debug, Fail)]
 pub enum ParseError {
     #[fail(display = "invalid severity value in priority header")]

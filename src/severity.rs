@@ -1,13 +1,21 @@
+/// Indicates the severity of the message
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-/// Syslog Severities from RFC 5424.
 pub enum Severity {
+    /// Emergency: system is unusable
     Emergency = 0,
+    /// Alert: action must be taken immediately
     Alert = 1,
+    /// Critical: critical conditions
     Critical = 2,
+    /// Error: error conditions
     Error = 3,
+    /// Warning: warning conditions
     Warning = 4,
+    /// Notice: normal but significant condition
     Notice = 5,
+    /// Informational: informational messages
     Info = 6,
+    /// Debug: debug-level messages
     Debug = 7,
 }
 
