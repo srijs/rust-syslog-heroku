@@ -1,7 +1,5 @@
-use std::str::FromStr;
-use std::str;
-use std::num;
-use std::string;
+use std::str::{FromStr, Utf8Error, from_utf8};
+use std::num::ParseIntError;
 
 use chrono::{DateTime, FixedOffset, TimeZone};
 
@@ -11,7 +9,7 @@ use message::Message;
 #[derive(Debug, Fail)]
 pub enum ParseError {
     #[fail(display = "invalid severity value in priority header")]
-    BadSeverityInPri,
+    InvalidSeverity,
     #[fail(display = "unexpected end of input")]
     UnexpectedEndOfInput,
     #[fail(display = "too few digits")]
@@ -23,15 +21,11 @@ pub enum ParseError {
     #[fail(display = "unsupported version {}", _0)]
     UnsupportedVersion(u32),
     #[fail(display = "unicode error: {}", _0)]
-    BaseUnicodeError(#[cause] str::Utf8Error),
-    #[fail(display = "unicode error: {}", _0)]
-    UnicodeError(#[cause] string::FromUtf8Error),
+    Unicode(#[cause] Utf8Error),
     #[fail(display = "expected token '{}'", _0)]
-    ExpectedTokenErr(char),
+    ExpectedToken(char),
     #[fail(display = "parse int error: {}", _0)]
-    IntConversionErr(#[cause] num::ParseIntError),
-    #[fail(display = "missing field '{}'", _0)]
-    MissingField(&'static str)
+    ParseInt(#[cause] ParseIntError),
 }
 
 // We parse with this super-duper-dinky hand-coded recursive descent parser because we don't really
@@ -70,7 +64,7 @@ macro_rules! take_char {
             Some($c) => &$e[1..],
             Some(_) => {
                 //println!("Error with rest={:?}", $e);
-                return Err(ParseError::ExpectedTokenErr($c));
+                return Err(ParseError::ExpectedToken($c));
             },
             None => {
                 //println!("Error with rest={:?}", $e);
@@ -95,7 +89,7 @@ fn take_while<F>(input: &str, f: F, max_chars: usize) -> (&str, Option<&str>)
 }
 
 fn parse_pri_val(pri: u32) -> ParseResult<Severity> {
-    Severity::from_int(pri & 0x7).ok_or(ParseError::BadSeverityInPri)
+    Severity::from_int(pri & 0x7).ok_or(ParseError::InvalidSeverity)
 }
 
 fn parse_num(s: &str, min_digits: usize, max_digits: usize) -> ParseResult<(u32, &str)> {
@@ -106,7 +100,7 @@ fn parse_num(s: &str, min_digits: usize, max_digits: usize) -> ParseResult<(u32,
     } else if res.len() > max_digits {
         Err(ParseError::TooManyDigits)
     } else {
-        Ok((u32::from_str(res).map_err(ParseError::IntConversionErr)?, rest))
+        Ok((u32::from_str(res).map_err(ParseError::ParseInt)?, rest))
     }
 }
 
@@ -142,8 +136,8 @@ fn parse_timestamp(m: &str) -> ParseResult<(Option<DateTime<FixedOffset>>, &str)
                 '-' => (-1, &rest[1..]),
                 _ => { return Err(ParseError::InvalidDateTime); }
             };
-            let hours = i32::from_str(&irest[0..2]).map_err(ParseError::IntConversionErr)?;
-            let minutes = i32::from_str(&irest[3..5]).map_err(ParseError::IntConversionErr)?;
+            let hours = i32::from_str(&irest[0..2]).map_err(ParseError::ParseInt)?;
+            let minutes = i32::from_str(&irest[3..5]).map_err(ParseError::ParseInt)?;
             rest = &irest[5..];
             minutes + hours * 60 * sign
         }
@@ -170,11 +164,11 @@ fn parse_term(m: &str, min_length: usize, max_length: usize) -> ParseResult<(Opt
             if idx < min_length {
                 return Err(ParseError::TooFewDigits);
             }
-            let utf8_ary = str::from_utf8(&byte_ary[..idx]).map_err(ParseError::BaseUnicodeError)?;
+            let utf8_ary = from_utf8(&byte_ary[..idx]).map_err(ParseError::Unicode)?;
             return Ok((Some(String::from(utf8_ary)), &m[idx..]));
         }
         if idx >= max_length {
-            let utf8_ary = str::from_utf8(&byte_ary[..idx]).map_err(ParseError::BaseUnicodeError)?;
+            let utf8_ary = from_utf8(&byte_ary[..idx]).map_err(ParseError::Unicode)?;
             return Ok((Some(String::from(utf8_ary)), &m[idx..]));
         }
     }
