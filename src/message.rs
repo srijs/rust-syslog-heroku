@@ -9,20 +9,13 @@ use chrono::offset::FixedOffset;
 use severity::Severity;
 use parser::{ParseError, parse_message};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-/// `ProcID`s are usually numeric PIDs; however, on some systems, they may be something else
-pub enum ProcId {
-    Pid(u32),
-    Name(String)
-}
-
 #[derive(Clone,Debug)]
 pub struct Message {
     pub severity: Severity,
     pub timestamp: Option<DateTime<FixedOffset>>,
     pub hostname: Option<String>,
     pub appname: Option<String>,
-    pub procid: Option<ProcId>,
+    pub procid: Option<String>,
     pub msgid: Option<String>,
     pub msg: String,
 }

@@ -6,7 +6,7 @@ use std::string;
 use chrono::{DateTime, FixedOffset, TimeZone};
 
 use severity::Severity;
-use message::{Message, ProcId};
+use message::Message;
 
 #[derive(Debug, Fail)]
 pub enum ParseError {
@@ -202,14 +202,7 @@ pub fn parse_message(m: &str) -> ParseResult<Message> {
     let appname = take_item!(parse_term(rest, 1, 48), rest);
     //println!("got appname {:?}, rest={:?}", appname, rest);
     take_char!(rest, ' ');
-    let procid_r = take_item!(parse_term(rest, 1, 128), rest);
-    let procid = match procid_r {
-        None => None,
-        Some(s) => Some(match u32::from_str(&s) {
-            Ok(n) => ProcId::Pid(n),
-            Err(_) => ProcId::Name(s)
-        })
-    };
+    let procid = take_item!(parse_term(rest, 1, 128), rest);
     //println!("got procid {:?}, rest={:?}", procid, rest);
     take_char!(rest, ' ');
     let msgid = take_item!(parse_term(rest, 1, 32), rest);
@@ -235,7 +228,6 @@ pub fn parse_message(m: &str) -> ParseResult<Message> {
 mod tests {
     use super::parse_message;
 
-    use message::ProcId;
     use severity::Severity;
 
     #[test]
@@ -246,7 +238,7 @@ mod tests {
         assert_eq!(msg.timestamp.map(|dt| dt.timestamp()), Some(1407176923));
         assert_eq!(msg.hostname, Some("host".to_owned()));
         assert_eq!(msg.appname, Some("heroku".to_owned()));
-        assert_eq!(msg.procid, Some(ProcId::Name("router".to_owned())));
+        assert_eq!(msg.procid, Some("router".to_owned()));
         assert_eq!(msg.msgid, None);
     }
 
@@ -258,7 +250,7 @@ mod tests {
         assert_eq!(msg.timestamp.map(|dt| dt.timestamp()), Some(1407176923));
         assert_eq!(msg.hostname, Some("host".to_owned()));
         assert_eq!(msg.appname, Some("app".to_owned()));
-        assert_eq!(msg.procid, Some(ProcId::Name("web.1".to_owned())));
+        assert_eq!(msg.procid, Some("web.1".to_owned()));
         assert_eq!(msg.msgid, None);
     }
 }

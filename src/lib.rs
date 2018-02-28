@@ -38,5 +38,5 @@ mod severity;
 mod parser;
 
 pub use severity::Severity;
-pub use message::{ProcId, Message};
+pub use message::Message;
 pub use parser::ParseError;
