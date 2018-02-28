@@ -242,7 +242,7 @@ mod tests {
     fn test_router_message() {
         let msg = parse_message(r#"<158>1 2014-08-04T18:28:43.078581+00:00 host heroku router - at=info method=GET path="/foo" host=app-name-7277.herokuapp.com request_id=e5bb3580-44b0-46d2-aad3-185263641044 fwd="50.168.96.221" dyno=web.1 connect=0ms service=2ms status=200 bytes=415"#)
             .expect("Should parse router message");
-        assert_eq!(msg.severity, Severity::SEV_INFO);
+        assert_eq!(msg.severity, Severity::Info);
         assert_eq!(msg.timestamp.map(|dt| dt.timestamp()), Some(1407176923));
         assert_eq!(msg.hostname, Some("host".to_owned()));
         assert_eq!(msg.appname, Some("heroku".to_owned()));
@@ -254,7 +254,7 @@ mod tests {
     fn test_web_app_message() {
         let msg = parse_message(r#"<190>1 2014-08-04T18:28:43.015630+00:00 host app web.1 - 50.168.96.221 - - [04/Aug/2014 18:28:43] "GET /foo HTTP/1.1" 200 12 0.0019"#)
             .expect("Should parse web app message");
-        assert_eq!(msg.severity, Severity::SEV_INFO);
+        assert_eq!(msg.severity, Severity::Info);
         assert_eq!(msg.timestamp.map(|dt| dt.timestamp()), Some(1407176923));
         assert_eq!(msg.hostname, Some("host".to_owned()));
         assert_eq!(msg.appname, Some("app".to_owned()));
