@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::str::FromStr;
 use std::str;
 use std::num;
@@ -86,100 +85,6 @@ fn take_while<F>(input: &str, f: F, max_chars: usize) -> (&str, Option<&str>)
         }
     }
     ("", None)
-}
-
-fn parse_sd_id(input: &str) -> ParseResult<(String, &str)> {
-    let (res, rest) = take_while(input, |c| c != ' ' && c != '=' && c != ']', 128);
-    Ok((String::from(res), match rest {
-        Some(s) => s,
-        None => { return Err(ParseErr::UnexpectedEndOfInput); }
-    }))
-}
-
-/** Parse a `param_value`... a.k.a. a quoted string */
-fn parse_param_value(input: &str) -> ParseResult<(Cow<str>, &str)> {
-    let mut rest = input;
-    take_char!(rest, '"');
-    // Can't do a 0-copy &str slice here because we need to un-escape escaped quotes
-    // in the string. :-(
-    let mut result = String::new();
-
-    let mut saw_any_escapes = false;
-    let mut escaped = false;
-
-    for (idx, chr) in rest.char_indices() {
-        if escaped {
-            escaped = false
-        } else {
-            if chr == '\\' {
-                escaped = true;
-                if !saw_any_escapes {
-                    result.push_str(&rest[..idx]);
-                }
-                saw_any_escapes = true;
-                continue;
-            }
-            if chr == '"' {
-                let res_cow = if saw_any_escapes {
-                    Cow::Owned(result)
-                } else {
-                    Cow::Borrowed(&rest[..idx])
-                };
-                return Ok((res_cow, &rest[(idx + 1)..]));
-            }
-        }
-        if saw_any_escapes {
-            result.push(chr);
-        }
-    }
-
-    Err(ParseErr::UnexpectedEndOfInput)
-}
-
-type ParsedSDParams = Vec<(String, String)>;
-
-fn parse_sd_params(input: &str) -> ParseResult<(ParsedSDParams, &str)> {
-    let mut params = Vec::new();
-    let mut top = input;
-    loop {
-        if let Some(rest2) = maybe_expect_char!(top, ' ') {
-            let mut rest = rest2;
-            let param_name = take_item!(parse_sd_id(rest), rest);
-            take_char!(rest, '=');
-            let param_value = take_item!(parse_param_value(rest), rest);
-            // is there an uglier modifier than &*
-            params.push((param_name, String::from(&*param_value)));
-            top = rest;
-        } else {
-            return Ok((params, top));
-        }
-    }
-}
-
-fn parse_sde(sde: &str) -> ParseResult<((String, ParsedSDParams), &str)> {
-    let mut rest = sde;
-    take_char!(rest, '[');
-    let id = take_item!(parse_sd_id(rest), rest);
-    let params = take_item!(parse_sd_params(rest), rest);
-    take_char!(rest, ']');
-    Ok(((id, params), rest))
-}
-
-fn parse_sd(structured_data_raw: &str) -> ParseResult<(StructuredData, &str)> {
-    let mut sd = StructuredData::new_empty();
-    if structured_data_raw.starts_with('-') {
-        return Ok((sd, &structured_data_raw[1..]))
-    }
-    let mut rest = structured_data_raw;
-    loop {
-        let (sd_id, params) = take_item!(parse_sde(rest), rest);
-        for (sd_param_id, sd_param_value) in params {
-            sd.insert_tuple(sd_id.clone(), sd_param_id, sd_param_value);
-        }
-        if rest.starts_with(' ') {
-            return Ok((sd, rest));
-        }
-    }
 }
 
 fn parse_pri_val(pri: i32) -> ParseResult<(severity::SyslogSeverity, facility::SyslogFacility)> {
@@ -297,8 +202,6 @@ fn parse_message_s(m: &str) -> ParseResult<SyslogMessage> {
     //println!("got procid {:?}, rest={:?}", procid, rest);
     take_char!(rest, ' ');
     let msgid = take_item!(parse_term(rest, 1, 32), rest);
-    take_char!(rest, ' ');
-    let sd = take_item!(parse_sd(rest), rest);
     //println!("got sd {:?}, rest={:?}", sd, rest);
     rest = match maybe_expect_char!(rest, ' ') {
         Some(r) => r,
@@ -315,7 +218,7 @@ fn parse_message_s(m: &str) -> ParseResult<SyslogMessage> {
         appname: appname,
         procid: procid,
         msgid: msgid,
-        sd: sd,
+        sd: StructuredData::new_empty(),
         msg: msg
     })
 }
@@ -349,114 +252,34 @@ pub fn parse_message<S: AsRef<str>> (s: S) -> ParseResult<SyslogMessage> {
 #[cfg(test)]
 mod tests {
     use super::parse_message;
-    use message;
 
+    use message::ProcIdType;
     use facility::SyslogFacility;
     use severity::SyslogSeverity;
 
     #[test]
-    fn test_simple() {
-        let msg = parse_message("<1>1 - - - - - -").expect("Should parse empty message");
-        assert!(msg.facility == SyslogFacility::LOG_KERN);
-        assert!(msg.severity == SyslogSeverity::SEV_ALERT);
-        assert!(msg.timestamp.is_none());
-        assert!(msg.hostname.is_none());
-        assert!(msg.appname.is_none());
-        assert!(msg.procid.is_none());
-        assert!(msg.msgid.is_none());
-        assert!(msg.sd.len() == 0);
-    }
-
-    #[test]
-    fn test_with_time_zulu() {
-        let msg = parse_message("<1>1 2015-01-01T00:00:00Z host - - - -").expect("Should parse empty message");
-        assert_eq!(msg.timestamp, Some(1420070400));
-    }
-
-    #[test]
-    fn test_with_time_offset() {
-        let msg = parse_message("<1>1 2015-01-01T00:00:00+00:00 - - - - -").expect("Should parse empty message");
-        assert_eq!(msg.timestamp, Some(1420070400));
-    }
-
-    #[test]
-    fn test_with_time_offset_nonzero() {
-        let msg = parse_message("<1>1 2015-01-01T00:00:00+10:00 - - - - -").expect("Should parse empty message");
-        assert_eq!(msg.timestamp, Some(1420106400));
-    }
-
-    #[test]
-    fn test_complex() {
-        let msg = parse_message("<78>1 2016-01-15T00:04:01+00:00 host1 CROND 10391 - [meta sequenceId=\"29\"] some_message").expect("Should parse complex message");
-        assert_eq!(msg.facility, SyslogFacility::LOG_CRON);
+    fn test_router_message() {
+        let msg = parse_message(r#"<158>1 2014-08-04T18:28:43.078581+00:00 host heroku router - at=info method=GET path="/foo" host=app-name-7277.herokuapp.com request_id=e5bb3580-44b0-46d2-aad3-185263641044 fwd="50.168.96.221" dyno=web.1 connect=0ms service=2ms status=200 bytes=415"#)
+            .expect("Should parse router message");
+        assert_eq!(msg.facility, SyslogFacility::LOG_LOCAL3);
         assert_eq!(msg.severity, SyslogSeverity::SEV_INFO);
-        assert_eq!(msg.hostname, Some(String::from("host1")));
-        assert_eq!(msg.appname, Some(String::from("CROND")));
-        assert_eq!(msg.procid, Some(message::ProcIdType::PID(10391)));
-        assert_eq!(msg.msg, String::from("some_message"));
-        assert_eq!(msg.timestamp, Some(1452816241));
-        assert_eq!(msg.sd.len(), 1);
-        let v = msg.sd.find_tuple("meta", "sequenceId").expect("Should contain meta sequenceId");
-        assert_eq!(v, "29");
+        assert_eq!(msg.timestamp, Some(1407176923));
+        assert_eq!(msg.hostname, Some("host".to_owned()));
+        assert_eq!(msg.appname, Some("heroku".to_owned()));
+        assert_eq!(msg.procid, Some(ProcIdType::Name("router".to_owned())));
+        assert_eq!(msg.msgid, None);
     }
 
     #[test]
-    fn test_sd_features() {
-        let msg = parse_message("<78>1 2016-01-15T00:04:01Z host1 CROND 10391 - [meta sequenceId=\"29\" sequenceBlah=\"foo\"][my key=\"value\"][meta bar=\"baz=\"] some_message").expect("Should parse complex message");
-        assert_eq!(msg.facility, SyslogFacility::LOG_CRON);
+    fn test_web_app_message() {
+        let msg = parse_message(r#"<190>1 2014-08-04T18:28:43.015630+00:00 host app web.1 - 50.168.96.221 - - [04/Aug/2014 18:28:43] "GET /foo HTTP/1.1" 200 12 0.0019"#)
+            .expect("Should parse web app message");
+        assert_eq!(msg.facility, SyslogFacility::LOG_LOCAL7);
         assert_eq!(msg.severity, SyslogSeverity::SEV_INFO);
-        assert_eq!(msg.hostname, Some(String::from("host1")));
-        assert_eq!(msg.appname, Some(String::from("CROND")));
-        assert_eq!(msg.procid, Some(message::ProcIdType::PID(10391)));
-        assert_eq!(msg.msg, String::from("some_message"));
-        assert_eq!(msg.timestamp, Some(1452816241));
-        assert_eq!(msg.sd.len(), 2);
-        assert_eq!(msg.sd.find_sdid("meta").expect("should contain meta").len(), 3);
-    }
-
-    #[test]
-    fn test_sd_with_escaped_quote() {
-        let msg_text = r#"<1>1 - - - - - [meta key="val\"ue"] message"#;
-        let msg = parse_message(msg_text).expect("should parse");
-        assert_eq!(msg.sd.find_tuple("meta", "key").expect("Should contain meta key"), r#"val"ue"#);
-    }
-
-    #[test]
-    fn test_other_message() { 
-        let msg_text = r#"<190>1 2016-02-21T01:19:11+00:00 batch6sj - - - [meta sequenceId="21881798" x-group="37051387"][origin x-service="tracking"] metascutellar conversationalist nephralgic exogenetic graphy streng outtaken acouasm amateurism prenotice Lyonese bedull antigrammatical diosphenol gastriloquial bayoneteer sweetener naggy roughhouser dighter addend sulphacid uneffectless ferroprussiate reveal Mazdaist plaudite Australasian distributival wiseman rumness Seidel topazine shahdom sinsion mesmerically pinguedinous ophthalmotonometer scuppler wound eciliate expectedly carriwitchet dictatorialism bindweb pyelitic idic atule kokoon poultryproof rusticial seedlip nitrosate splenadenoma holobenthic uneternal Phocaean epigenic doubtlessly indirection torticollar robomb adoptedly outspeak wappenschawing talalgia Goop domitic savola unstrafed carded unmagnified mythologically orchester obliteration imperialine undisobeyed galvanoplastical cycloplegia quinquennia foremean umbonal marcgraviaceous happenstance theoretical necropoles wayworn Igbira pseudoangelic raising unfrounced lamasary centaurial Japanolatry microlepidoptera"#;
-        parse_message(msg_text).expect("should parse as text");
-    }
-
-    #[test]
-    fn test_bad_pri() {
-        let msg = parse_message("<4096>1 - - - - - -");
-        assert!(msg.is_err());
-    }
-
-    #[test]
-    fn test_bad_match() {
-        // we shouldn't be able to parse RFC3164 messages
-        let msg = parse_message("<134>Feb 18 20:53:31 haproxy[376]: I am a message");
-        assert!(msg.is_err());
-    }
-
-    #[test]
-    fn test_example_timestamps() {
-        // these are the example timestamps in the rfc
-
-        let msg = parse_message("<1>1 1985-04-12T23:20:50.52Z host - - - -")
-            .expect("Should parse empty message");
-        assert_eq!(msg.timestamp, Some(482196050));
-
-        let msg = parse_message("<1>1 1985-04-12T19:20:50.52-04:00 host - - - -")
-            .expect("Should parse empty message");
-        assert_eq!(msg.timestamp, Some(482167250));
-
-        let msg = parse_message("<1>1 2003-08-24T05:14:15.000003-07:00 host - - - -")
-            .expect("Should parse empty message");
-        assert_eq!(msg.timestamp, Some(1061676855));
-
-        let msg = parse_message("<1>1 2003-08-24T05:14:15.000000003-07:00 host - - - -");
-        assert!(msg.is_err(), "expected parse fail");
+        assert_eq!(msg.timestamp, Some(1407176923));
+        assert_eq!(msg.hostname, Some("host".to_owned()));
+        assert_eq!(msg.appname, Some("app".to_owned()));
+        assert_eq!(msg.procid, Some(ProcIdType::Name("web.1".to_owned())));
+        assert_eq!(msg.msgid, None);
     }
 }
