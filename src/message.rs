@@ -7,7 +7,6 @@ use chrono::DateTime;
 use chrono::offset::FixedOffset;
 
 use severity::Severity;
-use facility::Facility;
 use parser::{ParseError, parse_message};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -20,8 +19,6 @@ pub enum ProcId {
 #[derive(Clone,Debug)]
 pub struct Message {
     pub severity: Severity,
-    pub facility: Facility,
-    pub version: u32,
     pub timestamp: Option<DateTime<FixedOffset>>,
     pub hostname: Option<String>,
     pub appname: Option<String>,

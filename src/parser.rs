@@ -6,15 +6,12 @@ use std::string;
 use chrono::{DateTime, FixedOffset, TimeZone};
 
 use severity::Severity;
-use facility::Facility;
 use message::{Message, ProcId};
 
 #[derive(Debug, Fail)]
 pub enum ParseError {
     #[fail(display = "invalid severity value in priority header")]
     BadSeverityInPri,
-    #[fail(display = "invalid facility value in priority header")]
-    BadFacilityInPri,
     #[fail(display = "unexpected end of input")]
     UnexpectedEndOfInput,
     #[fail(display = "too few digits")]
@@ -23,6 +20,8 @@ pub enum ParseError {
     TooManyDigits,
     #[fail(display = "invalid date time")]
     InvalidDateTime,
+    #[fail(display = "unsupported version {}", _0)]
+    UnsupportedVersion(u32),
     #[fail(display = "unicode error: {}", _0)]
     BaseUnicodeError(#[cause] str::Utf8Error),
     #[fail(display = "unicode error: {}", _0)]
@@ -95,10 +94,8 @@ fn take_while<F>(input: &str, f: F, max_chars: usize) -> (&str, Option<&str>)
     ("", None)
 }
 
-fn parse_pri_val(pri: u32) -> ParseResult<(Severity, Facility)> {
-    let sev = Severity::from_int(pri & 0x7).ok_or(ParseError::BadSeverityInPri)?;
-    let fac = Facility::from_int(pri >> 3).ok_or(ParseError::BadFacilityInPri)?;
-    Ok((sev, fac))
+fn parse_pri_val(pri: u32) -> ParseResult<Severity> {
+    Severity::from_int(pri & 0x7).ok_or(ParseError::BadSeverityInPri)
 }
 
 fn parse_num(s: &str, min_digits: usize, max_digits: usize) -> ParseResult<(u32, &str)> {
@@ -189,8 +186,11 @@ pub fn parse_message(m: &str) -> ParseResult<Message> {
     take_char!(rest, '<');
     let prival = take_item!(parse_num(rest, 1, 3), rest);
     take_char!(rest, '>');
-    let (sev, fac) = parse_pri_val(prival)?;
+    let sev = parse_pri_val(prival)?;
     let version = take_item!(parse_num(rest, 1, 2), rest);
+    if version != 1 {
+        return Err(ParseError::UnsupportedVersion(version));
+    }
     //println!("got version {:?}, rest={:?}", version, rest);
     take_char!(rest, ' ');
     let timestamp = take_item!(parse_timestamp(rest), rest);
@@ -222,8 +222,6 @@ pub fn parse_message(m: &str) -> ParseResult<Message> {
 
     Ok(Message {
         severity: sev,
-        facility: fac,
-        version: version,
         timestamp: timestamp,
         hostname: hostname,
         appname: appname,
@@ -238,14 +236,12 @@ mod tests {
     use super::parse_message;
 
     use message::ProcId;
-    use facility::Facility;
     use severity::Severity;
 
     #[test]
     fn test_router_message() {
         let msg = parse_message(r#"<158>1 2014-08-04T18:28:43.078581+00:00 host heroku router - at=info method=GET path="/foo" host=app-name-7277.herokuapp.com request_id=e5bb3580-44b0-46d2-aad3-185263641044 fwd="50.168.96.221" dyno=web.1 connect=0ms service=2ms status=200 bytes=415"#)
             .expect("Should parse router message");
-        assert_eq!(msg.facility, Facility::LOG_LOCAL3);
         assert_eq!(msg.severity, Severity::SEV_INFO);
         assert_eq!(msg.timestamp.map(|dt| dt.timestamp()), Some(1407176923));
         assert_eq!(msg.hostname, Some("host".to_owned()));
@@ -258,7 +254,6 @@ mod tests {
     fn test_web_app_message() {
         let msg = parse_message(r#"<190>1 2014-08-04T18:28:43.015630+00:00 host app web.1 - 50.168.96.221 - - [04/Aug/2014 18:28:43] "GET /foo HTTP/1.1" 200 12 0.0019"#)
             .expect("Should parse web app message");
-        assert_eq!(msg.facility, Facility::LOG_LOCAL7);
         assert_eq!(msg.severity, Severity::SEV_INFO);
         assert_eq!(msg.timestamp.map(|dt| dt.timestamp()), Some(1407176923));
         assert_eq!(msg.hostname, Some("host".to_owned()));

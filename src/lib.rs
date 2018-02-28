@@ -20,7 +20,7 @@
 //! loop {
 //!     let (data_read, _) = s.recv_from(&mut buf).unwrap();
 //!     let msg = str::from_utf8(&buf[0..data_read]).unwrap().parse::<Message>().unwrap();
-//!     println!("{:?} {:?} {:?} {:?}", msg.facility, msg.severity, msg.hostname, msg.msg);
+//!     println!("{:?} {:?} {:?}", msg.severity, msg.hostname, msg.msg);
 //! }
 //! ```
 //!
@@ -35,10 +35,8 @@ extern crate chrono;
 
 mod message;
 mod severity;
-mod facility;
 mod parser;
 
 pub use severity::Severity;
-pub use facility::Facility;
 pub use message::{ProcId, Message};
 pub use parser::ParseError;
